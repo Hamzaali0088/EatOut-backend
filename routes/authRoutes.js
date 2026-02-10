@@ -75,6 +75,15 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Resolve restaurant to expose tenant slug (subdomain) for dashboard routing
+    let restaurantSlug = null;
+    if (user.restaurant) {
+      const restaurant = await Restaurant.findById(user.restaurant);
+      if (restaurant?.website?.subdomain) {
+        restaurantSlug = restaurant.website.subdomain;
+      }
+    }
+
     const token = generateToken(user);
 
     res.json({
@@ -85,6 +94,7 @@ router.post('/login', async (req, res, next) => {
         email: user.email,
         role: user.role,
         restaurant: user.restaurant,
+        restaurantSlug,
       },
     });
   } catch (error) {
@@ -129,7 +139,8 @@ router.post('/register-restaurant', async (req, res, next) => {
 
     // Create the restaurant with trial subscription
     const trialDays = 14;
-    const trialEndsAt = new Date();
+    const trialStartsAt = new Date();
+    const trialEndsAt = new Date(trialStartsAt);
     trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
     const restaurant = await Restaurant.create({
@@ -143,11 +154,12 @@ router.post('/register-restaurant', async (req, res, next) => {
       subscription: {
         plan: 'ESSENTIAL',
         status: 'TRIAL',
+        trialStartsAt,
         trialEndsAt,
       },
     });
 
-    // Create the restaurant admin user
+    // Create the restaurant owner user (maps to restaurant_admin role in current RBAC)
     const adminUser = await User.create({
       name: ownerName,
       email: email.toLowerCase().trim(),
@@ -172,10 +184,15 @@ router.post('/register-restaurant', async (req, res, next) => {
         id: restaurant._id,
         name: restaurant.website.name,
         subdomain: restaurant.website.subdomain,
-        trialEndsAt: restaurant.subscription.trialEndsAt,
+        trialStart: restaurant.subscription.trialStartsAt || trialStartsAt,
+        trialEnd: restaurant.subscription.trialEndsAt || trialEndsAt,
       },
     });
   } catch (error) {
+    // Handle rare race condition on unique slug index
+    if (error && error.code === 11000 && error.keyValue && error.keyValue['website.subdomain']) {
+      return res.status(400).json({ message: 'Subdomain already taken' });
+    }
     next(error);
   }
 });

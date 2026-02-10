@@ -12,6 +12,10 @@ const subscriptionSchema = new mongoose.Schema(
       enum: ['TRIAL', 'ACTIVE', 'SUSPENDED'],
       default: 'TRIAL',
     },
+    // Trial window for newly created tenants
+    trialStartsAt: {
+      type: Date,
+    },
     trialEndsAt: {
       type: Date,
     },
