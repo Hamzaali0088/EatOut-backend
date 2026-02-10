@@ -50,6 +50,9 @@ const websiteSettingsSchema = new mongoose.Schema(
     description: {
       type: String,
     },
+    tagline: {
+      type: String,
+    },
     contactPhone: {
       type: String,
     },
@@ -58,6 +61,37 @@ const websiteSettingsSchema = new mongoose.Schema(
     },
     address: {
       type: String,
+    },
+    // Hero Slides for homepage carousel
+    heroSlides: [{
+      title: String,
+      subtitle: String,
+      imageUrl: String,
+      buttonText: String,
+      buttonLink: String,
+      isActive: { type: Boolean, default: true }
+    }],
+    // Social Media Links
+    socialMedia: {
+      facebook: String,
+      instagram: String,
+      twitter: String,
+      youtube: String,
+    },
+    // Theme Colors
+    themeColors: {
+      primary: { type: String, default: '#EF4444' },
+      secondary: { type: String, default: '#FFA500' },
+    },
+    // Opening Hours
+    openingHours: {
+      monday: { type: String, default: '9:00 AM - 10:00 PM' },
+      tuesday: { type: String, default: '9:00 AM - 10:00 PM' },
+      wednesday: { type: String, default: '9:00 AM - 10:00 PM' },
+      thursday: { type: String, default: '9:00 AM - 10:00 PM' },
+      friday: { type: String, default: '9:00 AM - 10:00 PM' },
+      saturday: { type: String, default: '10:00 AM - 11:00 PM' },
+      sunday: { type: String, default: '10:00 AM - 11:00 PM' },
     },
   },
   { _id: false }

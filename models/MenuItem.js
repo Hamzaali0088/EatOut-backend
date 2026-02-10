@@ -53,6 +53,14 @@ const menuItemSchema = new mongoose.Schema(
     imageUrl: {
       type: String,
     },
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
+    isBestSeller: {
+      type: Boolean,
+      default: false,
+    },
     inventoryConsumptions: [inventoryConsumptionSchema],
   },
   {

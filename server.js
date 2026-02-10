@@ -12,6 +12,8 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
+const posRoutes = require('./routes/posRoutes');
 
 const app = express();
 
@@ -24,6 +26,8 @@ app.use(morgan('dev'));
 app.use('/api/auth', authRoutes);
 app.use('/api', customerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/super', superAdminRoutes);
+app.use('/api/pos', posRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

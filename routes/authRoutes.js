@@ -1,31 +1,53 @@
 const express = require('express');
 const User = require('../models/User');
+const Restaurant = require('../models/Restaurant');
+const generateToken = require('../utils/generateToken');
 
 const router = express.Router();
 
 // @route   POST /api/auth/register
-// @desc    Register a new user
+// @desc    Register a new user (primarily for development; production should use super admin flows)
 // @access  Public
 router.post('/register', async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role, restaurantId } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Please provide name, email and password' });
     }
 
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email: email.toLowerCase().trim() });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const user = await User.create({ name, email, password });
+    let restaurant = null;
+    if (restaurantId) {
+      restaurant = await Restaurant.findById(restaurantId);
+      if (!restaurant) {
+        return res.status(400).json({ message: 'Invalid restaurantId' });
+      }
+    }
+
+    const user = await User.create({
+      name,
+      email: email.toLowerCase().trim(),
+      password,
+      role: role || 'staff',
+      restaurant: restaurant ? restaurant._id : undefined,
+    });
+
+    const token = generateToken(user);
 
     res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        restaurant: user.restaurant,
+      },
     });
   } catch (error) {
     next(error);
@@ -33,7 +55,7 @@ router.post('/register', async (req, res, next) => {
 });
 
 // @route   POST /api/auth/login
-// @desc    Login user (password check only, no JWT yet)
+// @desc    Login user and return JWT
 // @access  Public
 router.post('/login', async (req, res, next) => {
   try {
@@ -43,7 +65,7 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ message: 'Please provide email and password' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -53,12 +75,105 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    const token = generateToken(user);
+
     res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      message: 'Logged in successfully (token handling not implemented yet)',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        restaurant: user.restaurant,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   POST /api/auth/register-restaurant
+// @desc    Public restaurant owner signup - creates restaurant + admin user
+// @access  Public
+router.post('/register-restaurant', async (req, res, next) => {
+  try {
+    const {
+      restaurantName,
+      subdomain,
+      ownerName,
+      email,
+      password,
+      phone,
+    } = req.body;
+
+    // Validate required fields
+    if (!restaurantName || !subdomain || !ownerName || !email || !password) {
+      return res.status(400).json({ 
+        message: 'Please provide restaurant name, subdomain, owner name, email, and password' 
+      });
+    }
+
+    // Check if subdomain is already taken
+    const existingSubdomain = await Restaurant.findOne({ 
+      'website.subdomain': subdomain.toLowerCase().trim() 
+    });
+    if (existingSubdomain) {
+      return res.status(400).json({ message: 'Subdomain already taken' });
+    }
+
+    // Check if email is already registered
+    const userExists = await User.findOne({ email: email.toLowerCase().trim() });
+    if (userExists) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+
+    // Create the restaurant with trial subscription
+    const trialDays = 14;
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+
+    const restaurant = await Restaurant.create({
+      website: {
+        subdomain: subdomain.toLowerCase().trim(),
+        name: restaurantName,
+        contactPhone: phone || '',
+        contactEmail: email.toLowerCase().trim(),
+        isPublic: false, // Owner can enable later
+      },
+      subscription: {
+        plan: 'ESSENTIAL',
+        status: 'TRIAL',
+        trialEndsAt,
+      },
+    });
+
+    // Create the restaurant admin user
+    const adminUser = await User.create({
+      name: ownerName,
+      email: email.toLowerCase().trim(),
+      password,
+      role: 'restaurant_admin',
+      restaurant: restaurant._id,
+    });
+
+    // Generate token for immediate login
+    const token = generateToken(adminUser);
+
+    res.status(201).json({
+      token,
+      user: {
+        id: adminUser._id,
+        name: adminUser.name,
+        email: adminUser.email,
+        role: adminUser.role,
+        restaurant: adminUser.restaurant,
+      },
+      restaurant: {
+        id: restaurant._id,
+        name: restaurant.website.name,
+        subdomain: restaurant.website.subdomain,
+        trialEndsAt: restaurant.subscription.trialEndsAt,
+      },
     });
   } catch (error) {
     next(error);
@@ -66,4 +181,5 @@ router.post('/login', async (req, res, next) => {
 });
 
 module.exports = router;
+
 
