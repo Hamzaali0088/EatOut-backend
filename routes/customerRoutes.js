@@ -37,6 +37,11 @@ router.get('/menu', async (req, res, next) => {
       return res.status(404).json({ message: 'Restaurant not found' });
     }
 
+    // Block public website for suspended subscriptions
+    if (restaurant.subscription?.status === 'SUSPENDED') {
+      return res.status(403).json({ message: 'Subscription inactive or expired' });
+    }
+
     if (!restaurant.website?.isPublic) {
       return res.status(403).json({ message: 'Restaurant website is not public' });
     }
