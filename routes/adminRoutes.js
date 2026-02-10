@@ -9,7 +9,19 @@ const { protect, requireRole, requireRestaurant, requireActiveSubscription } = r
 
 const router = express.Router();
 
-router.use(protect, requireRole('restaurant_admin', 'super_admin'));
+// Allow restaurant owner and staff roles to access tenant admin APIs
+router.use(
+  protect,
+  requireRole(
+    'restaurant_admin',
+    'super_admin',
+    'admin',
+    'product_manager',
+    'cashier',
+    'manager',
+    'kitchen_staff'
+  )
+);
 
 // If not super admin, load the restaurant linked to the user and enforce active subscription
 router.use(async (req, res, next) => {
@@ -603,7 +615,15 @@ router.post('/users', async (req, res, next) => {
       return res.status(400).json({ message: 'Name, email and password are required' });
     }
 
-    if (role && !['staff', 'restaurant_admin'].includes(role)) {
+    // Allow descriptive UI roles; they are display-only and do not affect auth
+    const allowedRoles = [
+      'admin',
+      'product_manager',
+      'cashier',
+      'manager',
+      'kitchen_staff'
+    ];
+    if (role && !allowedRoles.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
@@ -616,7 +636,7 @@ router.post('/users', async (req, res, next) => {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      role: role || 'staff',
+      role: role || 'manager',
       restaurant: restaurantId,
     });
 
@@ -643,7 +663,14 @@ router.put('/users/:id', async (req, res, next) => {
     if (name !== undefined) user.name = name.trim();
     if (email !== undefined) user.email = email.toLowerCase().trim();
     if (role !== undefined) {
-      if (!['staff', 'restaurant_admin'].includes(role)) {
+      const allowedRoles = [
+        'admin',
+        'product_manager',
+        'cashier',
+        'manager',
+        'kitchen_staff'
+      ];
+      if (!allowedRoles.includes(role)) {
         return res.status(400).json({ message: 'Invalid role' });
       }
       user.role = role;

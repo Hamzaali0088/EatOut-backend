@@ -2,6 +2,8 @@ const express = require('express');
 const User = require('../models/User');
 const Restaurant = require('../models/Restaurant');
 const generateToken = require('../utils/generateToken');
+const generateRefreshToken = require('../utils/generateRefreshToken');
+const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
@@ -38,9 +40,11 @@ router.post('/register', async (req, res, next) => {
     });
 
     const token = generateToken(user);
+    const refreshToken = generateRefreshToken(user);
 
     res.status(201).json({
       token,
+      refreshToken,
       user: {
         id: user._id,
         name: user.name,
@@ -86,8 +90,11 @@ router.post('/login', async (req, res, next) => {
 
     const token = generateToken(user);
 
+    const refreshToken = generateRefreshToken(user);
+
     res.json({
       token,
+      refreshToken,
       user: {
         id: user._id,
         name: user.name,
@@ -170,9 +177,11 @@ router.post('/register-restaurant', async (req, res, next) => {
 
     // Generate token for immediate login
     const token = generateToken(adminUser);
+    const refreshToken = generateRefreshToken(adminUser);
 
     res.status(201).json({
       token,
+      refreshToken,
       user: {
         id: adminUser._id,
         name: adminUser.name,
@@ -193,6 +202,45 @@ router.post('/register-restaurant', async (req, res, next) => {
     if (error && error.code === 11000 && error.keyValue && error.keyValue['website.subdomain']) {
       return res.status(400).json({ message: 'Subdomain already taken' });
     }
+    next(error);
+  }
+});
+
+// @route   POST /api/auth/refresh
+// @desc    Refresh access token using refresh token
+// @access  Public (token-based)
+router.post('/refresh', async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ message: 'Refresh token is required' });
+    }
+
+    const secret = process.env.REFRESH_JWT_SECRET || process.env.JWT_SECRET;
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, secret);
+    } catch (err) {
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+
+    if (decoded.type !== 'refresh') {
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ message: 'User not found for refresh token' });
+    }
+
+    const newAccessToken = generateToken(user);
+    const newRefreshToken = generateRefreshToken(user);
+
+    res.json({
+      token: newAccessToken,
+      refreshToken: newRefreshToken,
+    });
+  } catch (error) {
     next(error);
   }
 });
